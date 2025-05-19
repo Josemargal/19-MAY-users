@@ -1,5 +1,6 @@
 package com.ironhack.users_micro.controller;
 
+import com.ironhack.users_micro.dto.AccountDTO;
 import com.ironhack.users_micro.dto.UserPatchAccountDTO;
 import com.ironhack.users_micro.exception.UserNotFoundException;
 import com.ironhack.users_micro.model.User;
@@ -7,6 +8,7 @@ import com.ironhack.users_micro.service.UserService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
 
@@ -14,9 +16,11 @@ import java.util.List;
 @RequestMapping("/api/user")
 public class UserController {
     private final UserService userService;
+    private final RestTemplate restTemplate;
 
-    public UserController(UserService userService) {
+    public UserController(UserService userService, RestTemplate restTemplate) {
         this.userService = userService;
+        this.restTemplate = restTemplate;
     }
 
     @GetMapping
@@ -31,6 +35,33 @@ public class UserController {
             return new ResponseEntity<>(foundUser, HttpStatus.FOUND);
         } catch (UserNotFoundException e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.NOT_FOUND);
+        }
+    }
+
+
+    @GetMapping("/{id}/with-account")
+    public ResponseEntity<?> getUserWithAccount(@PathVariable Long id) {
+        try {
+            User user = userService.getUserById(id);
+
+            // Llama al servicio de cuentas
+            String accountUrl = "http://localhost:8081/accounts/by-user/" + id;
+            AccountDTO accountDTO = restTemplate.getForObject(accountUrl, AccountDTO.class);
+
+            // Mapea a UserAccountDTO
+            AccountDTO AccountDTO = new AccountDTO();
+            AccountDTO.setName(user.getName());
+            AccountDTO.setEmail(user.getEmail());
+            if (accountDTO != null) {
+                AccountDTO.setAccountNumber(accountDTO.getAccountNumber());
+                AccountDTO.setBalance(accountDTO.getBalance());
+            }
+
+            return ResponseEntity.ok(AccountDTO);
+        } catch (UserNotFoundException e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.NOT_FOUND);
+        } catch (Exception e) {
+            return new ResponseEntity<>("Error fetching account info", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
